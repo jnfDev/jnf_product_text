@@ -122,10 +122,11 @@ class Jnf_Producttext extends Module
 
     public function hookActionAdminProductsControllerSaveBefore($params)
     {
-        $idProduct   = (int) Tools::getValue('id_product');
-        $productText = Tools::safeOutput(Tools::getValue('product_text'), true);
+        $idProduct    = (int) Tools::getValue('id_product');
+        $_productText = $this->getProductText($idProduct, true);
+        $productText  = Tools::safeOutput(Tools::getValue('product_text'), true);
 
-        if (Tools::getValue('id_producttext')) {
+        if ($_productText !== false) {
             $this->updateProductText($idProduct, $productText);
         } else {
             $this->insertProductText($idProduct, $productText);
