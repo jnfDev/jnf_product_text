@@ -153,13 +153,15 @@ class Jnf_Producttext extends Module
                 return false;
             }
 
+            $databaseLang = $this->database . '_lang';
+
             $query2 = array(
                 'id_producttext' => (int) $idProductText,
                 'id_lang'        => $id_lang,
                 'product_text'   => $productText,
             );
 
-            $result &= $db->insert($this->database, $query2, false, true, Db::INSERT, false);
+            $result &= $db->insert($databaseLang, $query2, false, true, Db::INSERT, false);
         }
         
         return $result;
