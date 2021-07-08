@@ -114,6 +114,13 @@ class Jnf_Producttext extends Module
             $db->getValue($sql) : $db->getRow($sql);
     }
 
+    public function getProductTextIdByIdProductId($idProduct)
+    {
+        $db  = Db::getInstance();
+        $sql = "SELECT `id_producttext` FROM `$this->database` WHERE `id_product`=" . (int) $idProduct;
+        return $db->getValue($sql);
+    }
+
     public function updateProductText($idProduct, $productText, $id_lang)
     {     
         $database     = $this->database;
@@ -142,29 +149,27 @@ class Jnf_Producttext extends Module
             'date_add'     => date('Y-m-d H:i:s'),
             'date_upd'     => date('Y-m-d H:i:s'),
         );
+        
+        // Check if the record on 
+        // the main table already exist.
+        $idProductText = $this->getProductTextIdByIdProductId($idProduct);
+        if (empty($idProductText)) {
+            $db->insert($this->database, $query1, false, true, Db::INSERT, false);
+            $idProductText = $this->getProductTextIdByIdProductId($idProduct);
+        }
 
-        $result = $db->insert($this->database, $query1, false, true, Db::INSERT, false);
-
-        if ($result === true) {
-            $sql = "SELECT `id_producttext` FROM `$this->database` WHERE `id_product`=" . (int) $idProduct;
-            $idProductText = $db->getValue($sql);
-
-            if (empty($idProductText)) {
-                return false;
-            }
-
+        if (!empty($idProductText)) {
             $databaseLang = $this->database . '_lang';
-
-            $query2 = array(
+            $query2       = array(
                 'id_producttext' => (int) $idProductText,
                 'id_lang'        => $id_lang,
                 'product_text'   => $productText,
             );
 
-            $result &= $db->insert($databaseLang, $query2, false, true, Db::INSERT, false);
+            return $db->insert($databaseLang, $query2, false, true, Db::INSERT, false);
         }
         
-        return $result;
+        return false;
     }
 
     /** Hooks  */
