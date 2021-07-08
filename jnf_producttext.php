@@ -86,7 +86,7 @@ class Jnf_Producttext extends Module
         $sql1 = "DROP TABLE IF EXISTS `$database`";
         $sql2 = "DROP TABLE IF EXISTS `$databaseLang`";
        
-        return $db->execute($sql1) && $db->execute($sql1);
+        return $db->execute($sql1) && $db->execute($sql2);
     }
 
     public function getProductText($idProduct, $id_lang, $only_text = true)
