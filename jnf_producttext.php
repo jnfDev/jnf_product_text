@@ -47,89 +47,149 @@ class Jnf_Producttext extends Module
     public function unistall()
     {
         return parent::uninstall() &&
-            $this->removeDatabase();
+            $this->removeDatabase()
+        ;
     }
 
     public function createDatabase()
     {
         $db = Db::getInstance();
 
-        $sql = "CREATE TABLE IF NOT EXISTS `$this->database` (
+        $database     = $this->database;
+        $databaseLang = $database . '_lang';
+
+        $sql1 = "CREATE TABLE IF NOT EXISTS `$database` (
             `id_producttext`  INT(10) UNSIGNED AUTO_INCREMENT,
-            `id_product`      INT(10) unsigned NOT NULL UNIQUE,
-            `product_text`    TEXT,
+            `id_product`      INT(10) UNSIGNED NOT NULL UNIQUE,
             `date_add`        DATETIME NOT NULL,
             `date_upd`        DATETIME NOT NULL,
             PRIMARY KEY (`id_producttext`, `id_product`)
         ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=UTF8;";
 
-        return $db->execute($sql);
+        $sql2 = "CREATE TABLE IF NOT EXISTS `$databaseLang` (
+            `id_producttext`  INT(10) UNSIGNED NOT NULL,
+            `id_lang`         INT(10) UNSIGNED NOT NULL UNIQUE,
+            `product_text`    TEXT,
+            PRIMARY KEY (`id_producttext`, `id_lang`)
+        ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=UTF8;";
+
+        return $db->execute($sql1) && $db->execute($sql2);
     }
 
     public function removeDatabase()
     {
-    
         $db  = Db::getInstance();
-        $sql = "DROP TABLE IF EXISTS `$this->database`";
+        
+        $database     = $this->database;
+        $databaseLang = $database . '_lang';
+
+        $sql1 = "DROP TABLE IF EXISTS `$database`";
+        $sql2 = "DROP TABLE IF EXISTS `$databaseLang`";
        
-        return $db->execute($sql);
+        return $db->execute($sql1) && $db->execute($sql1);
     }
 
-    public function getProductText($idProduct, $only_text = false)
+    public function getProductText($idProduct, $id_lang, $only_text = true)
     {
         $db  = Db::getInstance();
 
-        $colums = "`id_producttext` as `id`, `product_text` as `text`";
+        $colums = "pt.`id_producttext` as `id`, ptl.`product_text` as `text`";
 
         if ($only_text !== false) {
-            $colums = "`product_text` as `text`";
+            $colums = "ptl.`product_text` as `text`";
         }
 
-        $sql = "SELECT $colums FROM `$this->database`
-            WHERE `id_product` = " . (int) $idProduct;
+        $database     = $this->database;
+        $databaseLang = $database . '_lang';
+        $idProduct    = (int) $idProduct;
+        $id_lang      = (int) $id_lang;
+
+        $sql = "SELECT $colums FROM `$database` pt
+            INNER JOIN `$databaseLang` ptl ON ptl.`id_producttext` = pt.`id_producttext`
+            WHERE pt.`id_product` = $idProduct AND 
+                  ptl.`id_lang` = $id_lang
+        ";
 
         return ($only_text !== false) ? 
             $db->getValue($sql) : $db->getRow($sql);
     }
 
-    public function updateProductText($idProduct, $productText)
-    {
-        $db    = Db::getInstance();
-        $query = array(
-            'product_text' => pSQL($productText),
-            'date_upd'     => date('Y-m-d H:i:s'),
-        );
+    public function updateProductText($idProduct, $productText, $id_lang)
+    {     
+        $database     = $this->database;
+        $databaseLang = $database . '_lang';
+        $idProduct    = (int) $idProduct;
+        $id_lang      = (int) $id_lang;
+        $productText  = pSQL($productText);
+        $dataUpd      = date('Y-m-d H:i:s');
 
-        $where = 'id_product = ' . (int) $idProduct;
+        $sql = "UPDATE `$database` pt
+            INNER JOIN `$databaseLang` ptl ON ptl.`id_producttext` = pt.`id_producttext`
+            SET pt.`date_upd`      = '$dataUpd',
+                ptl.`product_text` = '$productText'
 
-        return $db->update($this->database, $query, $where, 1, false, true, false);
+            WHERE pt.`id_product`  = $idProduct AND ptl.`id_lang` = $id_lang;
+        ";
+
+        return Db::getInstance()->execute($sql);
     }
 
-    public function insertProductText($idProduct, $productText)
+    public function insertProductText($idProduct, $productText, $id_lang)
     {
-        $db    = Db::getInstance();
-        $query = array(
+        $db     = Db::getInstance();
+        $query1 = array(
             'id_product'   => (int) $idProduct,
-            'product_text' => pSQL($productText),
             'date_add'     => date('Y-m-d H:i:s'),
             'date_upd'     => date('Y-m-d H:i:s'),
         );
+
+        $result = $db->insert($this->database, $query1, false, true, Db::INSERT, false);
+
+        if ($result === true) {
+            $sql = "SELECT `id_producttext` FROM `$this->database` WHERE `id_product`=" . (int) $idProduct;
+            $idProductText = $db->getValue($sql);
+
+            if (empty($idProductText)) {
+                return false;
+            }
+
+            $query2 = array(
+                'id_producttext' => (int) $idProductText,
+                'id_lang'        => $id_lang,
+                'product_text'   => $productText,
+            );
+
+            $result &= $db->insert($this->database, $query2, false, true, Db::INSERT, false);
+        }
         
-        return $db->insert($this->database, $query, false, true, Db::INSERT, false );
+        return $result;
     }
 
     /** Hooks  */
 
     public function hookActionAdminProductsControllerSaveBefore($params)
     {
-        $idProduct    = (int) Tools::getValue('id_product');
-        $_productText = $this->getProductText($idProduct, true);
-        $productText  = Tools::safeOutput(Tools::getValue('product_text'), true);
+        $idProduct = (int) Tools::getValue('id_product');
+        $languages = $this->context->language->getLanguages();
 
-        if ($_productText !== false) {
-            $this->updateProductText($idProduct, $productText);
-        } else {
-            $this->insertProductText($idProduct, $productText);
+        foreach ($languages as $lang) {
+            $langIsoCode = $lang['iso_code'];
+            $currentProductText = $this->getProductText($idProduct, $lang['id_lang']);
+            $productText        = Tools::getValue('product_text_'. $langIsoCode);
+
+            if (empty($productText) || $productText === $currentProductText) {
+                continue;
+            }
+
+            if ($currentProductText !== false) {
+                if(!$this->updateProductText($idProduct, Tools::safeOutput($productText, true), $lang['id_lang'])) {
+                    throw new Exception("Error updaging your record");
+                }
+            } else {
+                if(!$this->insertProductText($idProduct, Tools::safeOutput($productText, true), $lang['id_lang'])) {
+                    throw new Exception("Error inserting your record");
+                }
+            }
         }
     }
 
@@ -137,18 +197,23 @@ class Jnf_Producttext extends Module
     {
         if ($this->isSymfonyContext() && $params['route'] === 'admin_product_form') {
 
-            $productTextRecord = $this->getProductText($params['id_product']);
+            $productText = array();
+            $languages   = $this->context->language->getLanguages();
 
-            $idProductText = isset($productTextRecord['id']) ? (int) $productTextRecord['id'] : false;
-            $productText   = isset($productTextRecord['text']) ? Tools::htmlentitiesDecodeUTF8($productTextRecord['text']) : '';
+            foreach ($languages as $lang) {
+                $langIsoCode = $lang['iso_code'];
+                $_productText = $this->getProductText($params['id_product'], $lang['id_lang']);
+                $productText[$langIsoCode] = Tools::htmlentitiesDecodeUTF8($_productText);
+            }
 
             /**
              * Note: for some reason $this->get('twig') didn't work, 
              * read more here: https://github.com/PrestaShop/PrestaShop/issues/20505#issuecomment-805884349
              */
             return SymfonyContainer::getInstance()->get('twig')->render('@Modules/'. $this->name .'/views/templates/admin/product_text.twig', [
-                'id_producttext' => $idProductText,
                 'product_text'   => $productText,
+                'languages'      => array_column($languages, 'iso_code'),
+                'default_lag'    => $this->context->language->iso_code,
             ]);
         }
     }
@@ -157,7 +222,8 @@ class Jnf_Producttext extends Module
     {
         $_html       = '';
         $idProduct   = (int) Tools::getValue('id_product');
-        $productText = $this->getProductText($idProduct, true);
+        $id_lang     = $this->context->language->id;
+        $productText = $this->getProductText($idProduct, $id_lang);
         
         if (!empty($productText)) {
             $_html .= '<div id="product-text">';

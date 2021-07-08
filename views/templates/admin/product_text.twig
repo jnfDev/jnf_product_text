@@ -5,15 +5,32 @@
             data-content="{{ 'This text will be shown on the Product Page.'|trans({}, 'Modules.Jnfproducttext.Admin') }}"></span>
     </h2>
 
+
     <div class="row">
-        <div class="col-xl-12 col-lg-12">
-            <textarea class="w-100" rows="6" name="product_text">{{ product_text }}</textarea>
+        {% for lang in languages %}
+        <div data-lang={{ lang }} class="product-text-wrapper col-xl-12 col-lg-12" {% if lang != default_lag %}style="display:none;"{% endif %}>
+            <textarea class="w-100" rows="6" name="product_text_{{ lang }}">{{ product_text[lang] }}</textarea>
             <span class="small font-secondary">
-                {{ 'You can also use HTML tags.'|trans({}, 'Modules.Jnfproducttext.Admin') }}
+                {{ 'To add a line-break press <b>shift + enter</b>'|trans({}, 'Modules.Jnfproducttext.Admin')|raw }}
             </span>
-            {% if id_producttext != false %}
-                <input type="hidden" name="id_producttext" value={{ id_producttext }}>
-            {% endif %}
         </div>
+        {% endfor %}
     </div>
 </div>
+
+<script>
+    const langSelector = document.getElementById('form_switch_language');
+
+    langSelector.addEventListener('change', function(e){
+        const currentLang         = this.value;
+        const productTextWrappers = document.getElementsByClassName('product-text-wrapper')
+
+        for (let item of productTextWrappers) {
+            item.style.display = 'none';
+
+            if (item.dataset.lang === currentLang) {
+                item.style.display = 'block';
+            }
+        }
+    });
+</script>
