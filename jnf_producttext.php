@@ -68,7 +68,7 @@ class Jnf_Producttext extends Module
 
         $sql2 = "CREATE TABLE IF NOT EXISTS `$databaseLang` (
             `id_producttext`  INT(10) UNSIGNED NOT NULL,
-            `id_lang`         INT(10) UNSIGNED NOT NULL UNIQUE,
+            `id_lang`         INT(10) UNSIGNED NOT NULL,
             `product_text`    TEXT,
             PRIMARY KEY (`id_producttext`, `id_lang`)
         ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=UTF8;";
